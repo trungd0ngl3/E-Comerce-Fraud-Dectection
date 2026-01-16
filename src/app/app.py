@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Add current and parent directory to path to ensure imports work correctly
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -66,12 +68,14 @@ st.markdown("""
     }
     .fraud-alert {
         background-color: #ffebee;
+        color: #555;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 5px solid #f44336;
     }
     .safe-alert {
         background-color: #e8f5e9;
+        color: #555;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 5px solid #4caf50;
@@ -101,11 +105,11 @@ def main():
     }
     selected_model = model_map[model_type]
     
-    # Sidebar - Prediction Mode
-    st.sidebar.title("📊 Prediction Mode")
-    mode = st.sidebar.radio(
-        "Choose prediction mode:",
-        ["Single Transaction", "Batch Prediction (CSV)"]
+    # Sidebar - Navigation
+    st.sidebar.title("📊 Navigation")
+    page = st.sidebar.radio(
+        "Choose page:",
+        ["Single Transaction", "Batch Prediction", "📈 Data Dashboard", "⚖️ Model Comparison"]
     )
     
     # Load model and scaler
@@ -123,8 +127,8 @@ def main():
     scaler = load_scaler(scaler_path)
     metrics = load_metrics(metrics_path)
     
-    # Display model metrics if available
-    if metrics and st.sidebar.checkbox("Show Model Performance", value=True):
+    # Display model metrics if available and on prediction pages
+    if page in ["Single Transaction", "Batch Prediction"] and metrics and st.sidebar.checkbox("Show Model Performance", value=True):
         st.sidebar.markdown("### 📈 Model Metrics")
         st.sidebar.metric("AUC-ROC", f"{metrics.get('auc_roc', 0):.4f}")
         st.sidebar.metric("Accuracy", f"{metrics.get('accuracy', 0):.4f}")
@@ -132,11 +136,15 @@ def main():
         st.sidebar.metric("Recall", f"{metrics.get('recall', 0):.4f}")
         st.sidebar.metric("F1-Score", f"{metrics.get('f1_score', 0):.4f}")
     
-    # Main content area
-    if mode == "Single Transaction":
+    # Main content area - routing
+    if page == "Single Transaction":
         show_single_transaction_form(model, scaler, selected_model)
-    else:
+    elif page == "Batch Prediction":
         show_batch_prediction(model, scaler, selected_model)
+    elif page == "📈 Data Dashboard":
+        show_data_dashboard()
+    elif page == "⚖️ Model Comparison":
+        show_model_comparison()
 
 
 def show_single_transaction_form(model, scaler, model_type):
@@ -423,6 +431,489 @@ def show_batch_prediction(model, scaler, model_type):
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
             st.exception(e)
+
+
+def show_data_dashboard():
+    """Display data statistics and analytics dashboard"""
+    
+    st.markdown("## 📊 Data Statistics Dashboard")
+    st.markdown("---")
+    
+    # Load data
+    data_path = "data/transactions.csv"
+    if not os.path.exists(data_path):
+        st.error(f"⚠️ Data file not found at {data_path}")
+        return
+    
+    try:
+        df = pd.read_csv(data_path)
+        
+        # Key Statistics
+        st.markdown("### 📈 Key Statistics")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            st.metric("Total Transactions", f"{len(df):,}")
+        
+        with col2:
+            fraud_count = (df['is_fraud'] == 1).sum() if 'is_fraud' in df.columns else 0
+            fraud_rate = (fraud_count / len(df) * 100) if len(df) > 0 else 0
+            st.metric("Fraud Cases", f"{fraud_count:,}", delta=f"{fraud_rate:.2f}%")
+        
+        with col3:
+            if 'amount' in df.columns:
+                st.metric("Avg Transaction", f"${df['amount'].mean():.2f}")
+            else:
+                st.metric("Avg Transaction", "N/A")
+        
+        with col4:
+            if 'amount' in df.columns:
+                st.metric("Max Transaction", f"${df['amount'].max():.2f}")
+            else:
+                st.metric("Max Transaction", "N/A")
+        
+        with col5:
+            if 'account_age_days' in df.columns:
+                st.metric("Avg Account Age", f"{df['account_age_days'].mean():.0f} days")
+            else:
+                st.metric("Avg Account Age", "N/A")
+        
+        st.markdown("---")
+        
+        # Data Analysis Tabs
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Amount Distribution", "🌍 Geographic Analysis", "⏰ Time Analysis", "📱 Channel & Category"])
+        
+        with tab1:
+            st.markdown("### Transaction Amount Distribution")
+            
+            col_a1, col_a2 = st.columns(2)
+            
+            with col_a1:
+                # Amount histogram
+                if 'amount' in df.columns:
+                    fig_amount = px.histogram(
+                        df,
+                        x='amount',
+                        nbins=50,
+                        title='Transaction Amount Distribution',
+                        labels={'amount': 'Amount ($)', 'count': 'Frequency'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig_amount.update_layout(height=400)
+                    st.plotly_chart(fig_amount, width='stretch')
+            
+            with col_a2:
+                # Box plot by fraud status
+                if 'amount' in df.columns and 'is_fraud' in df.columns:
+                    fig_box = px.box(
+                        df,
+                        x='is_fraud',
+                        y='amount',
+                        title='Amount Distribution by Fraud Status',
+                        labels={'amount': 'Amount ($)', 'is_fraud': 'Fraud Status'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig_box.update_layout(height=400, xaxis_title='Is Fraud')
+                    st.plotly_chart(fig_box, width='stretch')
+            
+            # Amount statistics
+            if 'amount' in df.columns:
+                st.markdown("#### Amount Statistics")
+                col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+                
+                with col_stats1:
+                    st.metric("Mean", f"${df['amount'].mean():.2f}")
+                with col_stats2:
+                    st.metric("Median", f"${df['amount'].median():.2f}")
+                with col_stats3:
+                    st.metric("Std Dev", f"${df['amount'].std():.2f}")
+                with col_stats4:
+                    st.metric("Min - Max", f"${df['amount'].min():.2f} - ${df['amount'].max():.2f}")
+        
+        with tab2:
+            st.markdown("### Geographic Analysis")
+            
+            col_g1, col_g2 = st.columns(2)
+            
+            with col_g1:
+                # Country distribution
+                if 'country' in df.columns:
+                    country_counts = df['country'].value_counts()
+                    fig_country = px.bar(
+                        x=country_counts.index,
+                        y=country_counts.values,
+                        title='Transactions by Country',
+                        labels={'x': 'Country', 'y': 'Count'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig_country.update_layout(height=400)
+                    st.plotly_chart(fig_country, width='stretch')
+            
+            with col_g2:
+                # BIN Country distribution
+                if 'bin_country' in df.columns:
+                    bin_country_counts = df['bin_country'].value_counts()
+                    fig_bin = px.pie(
+                        values=bin_country_counts.values,
+                        names=bin_country_counts.index,
+                        title='Card BIN Countries',
+                        height=400
+                    )
+                    st.plotly_chart(fig_bin, width='stretch')
+            
+            # Country fraud rate
+            if 'country' in df.columns and 'is_fraud' in df.columns:
+                st.markdown("#### Fraud Rate by Country")
+                fraud_by_country = df.groupby('country')['is_fraud'].agg(['sum', 'count'])
+                fraud_by_country['fraud_rate'] = (fraud_by_country['sum'] / fraud_by_country['count'] * 100)
+                fraud_by_country = fraud_by_country.sort_values('fraud_rate', ascending=False)
+                
+                fig_fraud_country = px.bar(
+                    x=fraud_by_country.index,
+                    y=fraud_by_country['fraud_rate'],
+                    title='Fraud Rate by Country (%)',
+                    labels={'x': 'Country', 'y': 'Fraud Rate (%)'},
+                    color=fraud_by_country['fraud_rate'],
+                    color_continuous_scale='Reds'
+                )
+                st.plotly_chart(fig_fraud_country, width='stretch')
+        
+        with tab3:
+            st.markdown("### Time Analysis")
+            
+            col_t1, col_t2 = st.columns(2)
+            
+            with col_t1:
+                # Hour distribution
+                if 'hour' in df.columns:
+                    hour_counts = df['hour'].value_counts().sort_index()
+                    fig_hour = px.bar(
+                        x=hour_counts.index,
+                        y=hour_counts.values,
+                        title='Transactions by Hour of Day',
+                        labels={'x': 'Hour (0-23)', 'y': 'Count'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig_hour.update_layout(height=400)
+                    st.plotly_chart(fig_hour, width='stretch')
+            
+            with col_t2:
+                # Fraud by hour
+                if 'hour' in df.columns and 'is_fraud' in df.columns:
+                    fraud_by_hour = df.groupby('hour')['is_fraud'].agg(['sum', 'count'])
+                    fraud_by_hour['fraud_rate'] = (fraud_by_hour['sum'] / fraud_by_hour['count'] * 100)
+                    
+                    fig_fraud_hour = px.line(
+                        x=fraud_by_hour.index,
+                        y=fraud_by_hour['fraud_rate'],
+                        title='Fraud Rate by Hour',
+                        labels={'x': 'Hour (0-23)', 'y': 'Fraud Rate (%)'},
+                        markers=True
+                    )
+                    fig_fraud_hour.update_layout(height=400)
+                    st.plotly_chart(fig_fraud_hour, width='stretch')
+        
+        with tab4:
+            st.markdown("### Channel & Category Analysis")
+            
+            col_c1, col_c2 = st.columns(2)
+            
+            with col_c1:
+                # Channel distribution
+                if 'channel' in df.columns:
+                    channel_counts = df['channel'].value_counts()
+                    fig_channel = px.pie(
+                        values=channel_counts.values,
+                        names=channel_counts.index,
+                        title='Transactions by Channel',
+                        height=400
+                    )
+                    st.plotly_chart(fig_channel, width='stretch')
+            
+            with col_c2:
+                # Merchant category distribution
+                if 'merchant_category' in df.columns:
+                    category_counts = df['merchant_category'].value_counts()
+                    fig_category = px.bar(
+                        x=category_counts.index,
+                        y=category_counts.values,
+                        title='Transactions by Merchant Category',
+                        labels={'x': 'Category', 'y': 'Count'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig_category.update_layout(height=400, xaxis_tickangle=-45)
+                    st.plotly_chart(fig_category, width='stretch')
+            
+            # Fraud rate by channel
+            if 'channel' in df.columns and 'is_fraud' in df.columns:
+                st.markdown("#### Fraud Rate by Channel")
+                fraud_by_channel = df.groupby('channel')['is_fraud'].agg(['sum', 'count'])
+                fraud_by_channel['fraud_rate'] = (fraud_by_channel['sum'] / fraud_by_channel['count'] * 100)
+                
+                fig_fraud_channel = px.bar(
+                    x=fraud_by_channel.index,
+                    y=fraud_by_channel['fraud_rate'],
+                    title='Fraud Rate by Channel (%)',
+                    labels={'x': 'Channel', 'y': 'Fraud Rate (%)'},
+                    color=fraud_by_channel['fraud_rate'],
+                    color_continuous_scale='Reds'
+                )
+                st.plotly_chart(fig_fraud_channel, width='stretch')
+        
+        # Data Details Section
+        st.markdown("---")
+        st.markdown("### 📋 Data Overview")
+        
+        if st.checkbox("Show detailed data information"):
+            col_info1, col_info2 = st.columns(2)
+            
+            with col_info1:
+                st.markdown("#### Data Types")
+                st.write(df.dtypes)
+            
+            with col_info2:
+                st.markdown("#### Missing Values")
+                st.write(df.isnull().sum())
+            
+            st.markdown("#### First 20 Rows")
+            st.dataframe(df.head(20), width='stretch')
+        
+    except Exception as e:
+        st.error(f"❌ Error loading data: {str(e)}")
+        st.exception(e)
+
+
+def show_model_comparison():
+    """Display model metrics comparison"""
+    
+    st.markdown("## ⚖️ Model Comparison")
+    st.markdown("Compare the performance metrics of different fraud detection models")
+    st.markdown("---")
+    
+    # Load all metrics
+    models_info = {
+        "Logistic Regression": "models/lr_metrics.json",
+        "CatBoost": "models/catboost_metrics.json",
+        "TabNet": "models/tabnet_metrics.json"
+    }
+    
+    all_metrics = {}
+    available_models = []
+    
+    for model_name, metrics_path in models_info.items():
+        metrics = load_metrics(metrics_path)
+        if metrics:
+            all_metrics[model_name] = metrics
+            available_models.append(model_name)
+    
+    if not available_models:
+        st.error("⚠️ No model metrics found. Please train the models first.")
+        return
+    
+    st.info(f"✅ Found metrics for: {', '.join(available_models)}")
+    
+    st.markdown("---")
+    
+    # Metrics Selection
+    st.markdown("### 📊 Available Metrics")
+    st.info("Select metrics to compare across models")
+    
+    metrics_list = ['accuracy', 'precision', 'recall', 'f1_score', 'auc_roc']
+    
+    # Create comparison table
+    st.markdown("### Detailed Metrics Comparison")
+    
+    comparison_data = []
+    for model_name in available_models:
+        row = {'Model': model_name}
+        for metric in metrics_list:
+            row[metric] = all_metrics[model_name].get(metric, 0)
+        comparison_data.append(row)
+    
+    comparison_df = pd.DataFrame(comparison_data)
+    comparison_df = comparison_df.set_index('Model')
+    
+    # Display metrics table with formatting
+    st.dataframe(
+        comparison_df.style.format("{:.4f}"),
+        width='stretch'
+    )
+    
+    st.markdown("---")
+    
+    # Visual Comparisons
+    st.markdown("### 📈 Visual Comparisons")
+    
+    # Tabs for different visualizations
+    tab1, tab2, tab3, tab4 = st.tabs(["Radar Chart", "Bar Charts", "Heatmap", "Summary"])
+    
+    with tab1:
+        st.markdown("#### Radar Chart Comparison")
+        st.markdown("View all metrics for each model in a radar plot")
+        
+        # Prepare data for radar chart
+        fig_radar = go.Figure()
+        
+        for model_name in available_models:
+            values = [all_metrics[model_name].get(metric, 0) for metric in metrics_list]
+            values += values[:1]  # Complete the loop for radar chart
+            
+            fig_radar.add_trace(go.Scatterpolar(
+                r=values,
+                theta=metrics_list + [metrics_list[0]],
+                fill='toself',
+                name=model_name,
+                opacity=0.7
+            ))
+        
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 1]
+                )),
+            height=500,
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig_radar, width='stretch')
+    
+    with tab2:
+        st.markdown("#### Individual Metric Comparisons")
+        
+        for metric in metrics_list:
+            values = [all_metrics[model_name].get(metric, 0) for model_name in available_models]
+            
+            fig_bar = px.bar(
+                x=available_models,
+                y=values,
+                title=f"{metric.replace('_', ' ').title()} Comparison",
+                labels={'x': 'Model', 'y': metric.replace('_', ' ').title()},
+                color=values,
+                color_continuous_scale='Viridis',
+                height=300
+            )
+            
+            st.plotly_chart(fig_bar, width='stretch')
+    
+    with tab3:
+        st.markdown("#### Heatmap Comparison")
+        
+        # Normalize for better visualization
+        comparison_normalized = comparison_df.copy()
+        
+        fig_heatmap = px.imshow(
+            comparison_normalized,
+            labels=dict(x="Metric", y="Model", color="Score"),
+            x=comparison_normalized.columns,
+            y=comparison_normalized.index,
+            color_continuous_scale='RdYlGn',
+            aspect='auto',
+            text_auto='.4f',
+            height=300
+        )
+        
+        st.plotly_chart(fig_heatmap, width='stretch')
+    
+    with tab4:
+        st.markdown("#### Performance Summary")
+        
+        # Find best model for each metric
+        st.markdown("**Best Model by Metric:**")
+        
+        summary_data = []
+        for metric in metrics_list:
+            values = {model: all_metrics[model].get(metric, 0) for model in available_models}
+            best_model = max(values, key=values.get)
+            best_score = values[best_model]
+            
+            summary_data.append({
+                'Metric': metric.replace('_', ' ').title(),
+                'Best Model': best_model,
+                'Score': f"{best_score:.4f}"
+            })
+        
+        summary_df = pd.DataFrame(summary_data)
+        st.dataframe(summary_df, width='stretch', hide_index=True)
+        
+        # Overall ranking
+        st.markdown("**Overall Model Ranking:**")
+        
+        # Calculate weighted score
+        weights = {
+            'accuracy': 0.2,
+            'precision': 0.2,
+            'recall': 0.2,
+            'f1_score': 0.2,
+            'auc_roc': 0.2
+        }
+        
+        scores = {}
+        for model_name in available_models:
+            score = sum(all_metrics[model_name].get(metric, 0) * weights[metric] for metric in metrics_list)
+            scores[model_name] = score
+        
+        ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        
+        ranking_data = []
+        for rank, (model_name, score) in enumerate(ranking, 1):
+            ranking_data.append({
+                'Rank': rank,
+                'Model': model_name,
+                'Overall Score': f"{score:.4f}"
+            })
+        
+        ranking_df = pd.DataFrame(ranking_data)
+        st.dataframe(ranking_df, width='stretch', hide_index=True)
+        
+        # Recommendations
+        st.markdown("---")
+        st.markdown("**Recommendations:**")
+        
+        best_model = ranking[0][0]
+        best_score = ranking[0][1]
+        
+        col_rec1, col_rec2 = st.columns(2)
+        
+        with col_rec1:
+            st.success(f"✅ **Recommended Model: {best_model}**\n\nOverall Score: {best_score:.4f}")
+        
+        with col_rec2:
+            st.info(f"📊 **Metrics Overview:**\n\n" +
+                   "\n".join([f"- {k.replace('_', ' ').title()}: {v:.4f}" 
+                             for k, v in all_metrics[best_model].items()]))
+    
+    st.markdown("---")
+    
+    # Model Details Expander
+    st.markdown("### 🔍 Detailed Model Metrics")
+    
+    for model_name in available_models:
+        with st.expander(f"📋 {model_name} - Full Details"):
+            col1, col2, col3 = st.columns(3)
+            
+            metrics_data = all_metrics[model_name]
+            
+            with col1:
+                st.metric("Accuracy", f"{metrics_data.get('accuracy', 0):.4f}")
+                st.metric("F1-Score", f"{metrics_data.get('f1_score', 0):.4f}")
+            
+            with col2:
+                st.metric("Precision", f"{metrics_data.get('precision', 0):.4f}")
+                st.metric("AUC-ROC", f"{metrics_data.get('auc_roc', 0):.4f}")
+            
+            with col3:
+                st.metric("Recall", f"{metrics_data.get('recall', 0):.4f}")
+            
+            st.markdown("#### Metrics Explanation")
+            st.write(f"""
+            - **Accuracy**: Overall correctness of predictions ({metrics_data.get('accuracy', 0):.1%})
+            - **Precision**: Correct fraud predictions / Total fraud predictions ({metrics_data.get('precision', 0):.1%})
+            - **Recall**: Fraud cases caught / Total fraud cases ({metrics_data.get('recall', 0):.1%})
+            - **F1-Score**: Harmonic mean of precision and recall ({metrics_data.get('f1_score', 0):.4f})
+            - **AUC-ROC**: Area under ROC curve - Model's ability to distinguish classes ({metrics_data.get('auc_roc', 0):.4f})
+            """)
 
 
 if __name__ == "__main__":

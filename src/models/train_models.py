@@ -5,6 +5,7 @@ import os
 import sys
 import pickle
 import json
+import math
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, OrdinalEncoder
@@ -103,9 +104,16 @@ def train_logistic_regression(X_train, X_test, y_train, y_test, cat_cols):
     )
     
     # Create pipeline without SMOTE for faster training
+    cat_idx = [X_train.columns.get_loc(c) for c in cat_cols]
+
     lr_pipeline = ImbPipeline(steps=[
+        ('smote', SMOTENC(
+            categorical_features=cat_idx,
+            sampling_strategy=0.1,
+            random_state=42
+        )),
         ('preprocessor', preprocessor),
-        ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced', n_jobs=-1))
+        ('classifier', LogisticRegression(max_iter=1000, n_jobs=-1))
     ])
     
     # Train
@@ -151,11 +159,11 @@ def train_catboost(X_train, X_test, y_train, y_test, cat_cols):
     
     # Create model
     cb_model = CatBoostClassifier(
-        iterations=500,
-        learning_rate=0.05,
+        iterations=2000,
+        learning_rate=0.02,
         depth=6,
         cat_features=cat_cols,
-        auto_class_weights='Balanced',
+        scale_pos_weight=25,
         verbose=100,
         eval_metric='AUC'
     )
@@ -196,59 +204,59 @@ def train_tabnet(X_train, X_test, y_train, y_test, cat_cols):
     # Prepare data for TabNet
     X_train_tab = X_train.copy()
     X_test_tab = X_test.copy()
-    
-    # Encode categorical features
+
     ord_encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+
     X_train_tab[cat_cols] = ord_encoder.fit_transform(X_train_tab[cat_cols].astype(str))
     X_test_tab[cat_cols] = ord_encoder.transform(X_test_tab[cat_cols].astype(str))
-    
+
     for col in cat_cols:
         X_train_tab[col] = X_train_tab[col].astype(int) + 1
         X_test_tab[col] = X_test_tab[col].astype(int) + 1
-    
-    # Get categorical indices and dimensions
+
     cat_idxs = [X_train.columns.get_loc(col) for col in cat_cols]
+
     cat_dims = []
     for col in cat_cols:
         vocab_size = int(X_train_tab[col].max()) + 1
         cat_dims.append(vocab_size)
-    
-    # Fill missing values
+
+
     for col in X_train.columns:
         if col not in cat_cols:
             med = X_train_tab[col].median()
             X_train_tab[col] = X_train_tab[col].fillna(med)
             X_test_tab[col] = X_test_tab[col].fillna(med)
-    
-    # Calculate class weights
+
     neg_count = (y_train == 0).sum()
     pos_count = (y_train == 1).sum()
-    weight_for_1 = neg_count / pos_count
+
+    weight_for_1 = math.sqrt(neg_count / pos_count)
+
     class_weights = torch.tensor([1.0, weight_for_1], dtype=torch.float32)
-    
-    print(f"Class weights: {class_weights}")
-    
-    # Create model
+
     clf_tabnet = TabNetClassifier(
         cat_idxs=cat_idxs,
         cat_dims=cat_dims,
-        cat_emb_dim=5,
+        cat_emb_dim=10,
+        n_d=16,
+        n_a=16,
         optimizer_fn=torch.optim.Adam,
         optimizer_params=dict(lr=2e-2),
-        scheduler_params={"step_size": 10, "gamma": 0.9},
+        scheduler_params={"step_size":10, "gamma":0.9},
         scheduler_fn=torch.optim.lr_scheduler.StepLR,
         verbose=10
     )
-    
-    # Create loss function
+
+    print('Training TabNet')
+
     loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
-    
-    # Train
+
     clf_tabnet.fit(
-        X_train=X_train_tab.values,
-        y_train=y_train.values.astype(int),
+        X_train=X_train_tab.values, 
+        y_train=y_train.values.astype(int), 
         eval_set=[
-            (X_train_tab.values, y_train.values.astype(int)),
+            (X_train_tab.values, y_train.values.astype(int)), 
             (X_test_tab.values, y_test.values.astype(int))
         ],
         eval_name=['train', 'valid'],
@@ -256,7 +264,7 @@ def train_tabnet(X_train, X_test, y_train, y_test, cat_cols):
         loss_fn=loss_fn,
         max_epochs=100,
         patience=10,
-        batch_size=1024,
+        batch_size=1024, 
         virtual_batch_size=128,
         num_workers=0,
         drop_last=False

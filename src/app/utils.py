@@ -373,3 +373,128 @@ def get_feature_importance_mock(model_type):
         'channel': 0.03
     }
     return features
+
+
+def load_all_model_metrics(models_dir='models'):
+    """
+    Load metrics for all available models
+    
+    Args:
+        models_dir: Directory containing model metrics files
+        
+    Returns:
+        Dictionary with model names as keys and their metrics as values
+    """
+    metrics_files = {
+        'Logistic Regression': 'lr_metrics.json',
+        'CatBoost': 'catboost_metrics.json',
+        'TabNet': 'tabnet_metrics.json'
+    }
+    
+    all_metrics = {}
+    for model_name, filename in metrics_files.items():
+        filepath = os.path.join(models_dir, filename)
+        metrics = load_metrics(filepath)
+        if metrics:
+            all_metrics[model_name] = metrics
+    
+    return all_metrics
+
+
+def create_model_comparison_radar(all_metrics, metrics_list=None):
+    """
+    Create radar chart for model comparison
+    
+    Args:
+        all_metrics: Dictionary of model metrics
+        metrics_list: List of metrics to compare
+        
+    Returns:
+        Plotly figure
+    """
+    if metrics_list is None:
+        metrics_list = ['accuracy', 'precision', 'recall', 'f1_score', 'auc_roc']
+    
+    fig = go.Figure()
+    
+    for model_name, metrics in all_metrics.items():
+        values = [metrics.get(metric, 0) for metric in metrics_list]
+        values += values[:1]  # Complete the loop for radar chart
+        
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=metrics_list + [metrics_list[0]],
+            fill='toself',
+            name=model_name,
+            opacity=0.7
+        ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1]
+            )),
+        height=500,
+        showlegend=True,
+        title='Model Performance Comparison'
+    )
+    
+    return fig
+
+
+def create_metrics_heatmap(comparison_df):
+    """
+    Create heatmap for metrics comparison
+    
+    Args:
+        comparison_df: DataFrame with models and metrics
+        
+    Returns:
+        Plotly figure
+    """
+    fig = px.imshow(
+        comparison_df,
+        labels=dict(x="Metric", y="Model", color="Score"),
+        x=comparison_df.columns,
+        y=comparison_df.index,
+        color_continuous_scale='RdYlGn',
+        aspect='auto',
+        text_auto='.4f',
+        height=400
+    )
+    
+    fig.update_layout(title='Model Metrics Heatmap')
+    
+    return fig
+
+
+def get_model_rankings(all_metrics, weights=None):
+    """
+    Calculate overall model rankings based on metrics
+    
+    Args:
+        all_metrics: Dictionary of model metrics
+        weights: Dictionary of metric weights (default equal weights)
+        
+    Returns:
+        List of tuples (model_name, score) sorted by score descending
+    """
+    if weights is None:
+        weights = {
+            'accuracy': 0.2,
+            'precision': 0.2,
+            'recall': 0.2,
+            'f1_score': 0.2,
+            'auc_roc': 0.2
+        }
+    
+    scores = {}
+    metrics_list = list(weights.keys())
+    
+    for model_name, metrics in all_metrics.items():
+        score = sum(metrics.get(metric, 0) * weights[metric] for metric in metrics_list)
+        scores[model_name] = score
+    
+    ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return ranking
