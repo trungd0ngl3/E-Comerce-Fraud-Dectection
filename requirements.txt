@@ -8,3 +8,5 @@ streamlit
 plotly
 seaborn
 matplotlib
+imbalanced-learn
+joblib
