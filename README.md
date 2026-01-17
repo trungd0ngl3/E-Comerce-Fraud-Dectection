@@ -7,7 +7,9 @@ A comprehensive fraud detection system built with Streamlit, featuring multiple 
 - 🤖 **Multiple Models**: Choose between Logistic Regression, CatBoost, and TabNet
 - 📊 **Single Transaction Analysis**: Input transaction details manually for instant fraud detection
 - 📂 **Batch Processing**: Upload CSV files for bulk transaction analysis
-- 📈 **Rich Visualizations**: Gauge charts, probability distributions, confusion matrices, ROC curves
+- 📈 **Data Statistics Dashboard**: Comprehensive analysis with transaction distribution, geographic insights, temporal patterns, and channel analytics
+- ⚖️ **Model Comparison Tool**: Compare model metrics (Accuracy, Precision, Recall, F1, AUC-ROC) with visualizations and recommendations
+- 📊 **Rich Visualizations**: Gauge charts, probability distributions, confusion matrices, ROC curves, radar charts, heatmaps
 - 🎯 **Real-time Predictions**: Get instant fraud probability and risk assessments
 - 💾 **Export Results**: Download analysis results as CSV files
 
@@ -79,6 +81,14 @@ The app will open in your browser at `http://localhost:8501`
 
 ## Using the App
 
+### Main Navigation
+
+Use the sidebar to access different features:
+- **Single Transaction**: Real-time fraud detection for individual transactions
+- **Batch Prediction**: Bulk analysis of multiple transactions
+- **📈 Data Dashboard**: Analyze transaction statistics and patterns
+- **⚖️ Model Comparison**: Compare model performance metrics
+
 ### Single Transaction Prediction
 
 1. Select a model from the sidebar
@@ -108,6 +118,31 @@ The app will open in your browser at `http://localhost:8501`
    - Detailed results table
 7. Download results as CSV
 
+### Data Statistics Dashboard
+
+1. Navigate to **"📈 Data Dashboard"** from sidebar
+2. View key statistics:
+   - Total transactions, fraud cases, average amounts
+3. Explore tabs:
+   - **Amount Distribution**: Transaction amounts, comparison by fraud status
+   - **Geographic Analysis**: Transactions by country, fraud rates by region
+   - **Time Analysis**: Hourly patterns, fraud rate by hour
+   - **Channel & Category**: Channel distribution, merchant category insights
+4. Check data quality in "Data Overview" section
+5. Export or analyze findings
+
+### Model Comparison
+
+1. Navigate to **"⚖️ Model Comparison"** from sidebar
+2. Review metrics table comparing all models
+3. Explore visualizations:
+   - **Radar Chart**: Multi-dimensional performance view
+   - **Bar Charts**: Individual metric comparisons
+   - **Heatmap**: Color-coded performance matrix
+   - **Summary**: Model rankings and recommendations
+4. View detailed metrics for each model
+5. Get deployment recommendations
+
 ## CSV Format for Batch Prediction
 
 Required columns:
@@ -128,13 +163,13 @@ Required columns:
 
 ## Model Performance
 
-Based on the fraud detection notebook, expected performance:
+Actual performance metrics from trained models:
 
 | Model | AUC-ROC | Accuracy | Precision | Recall | F1-Score |
 |-------|---------|----------|-----------|--------|----------|
-| Logistic Regression | 0.949 | 0.96 | 0.30 | 0.75 | 0.43 |
-| CatBoost | 0.977 | 0.96 | 0.33 | 0.89 | 0.48 |
-| TabNet | 0.961 | 0.91 | 0.18 | 0.90 | 0.30 |
+| Logistic Regression | 0.9437 | 0.9805 | 0.5484 | 0.6012 | 0.5736 |
+| CatBoost | 0.9772 | 0.9762 | 0.4752 | 0.8571 | 0.6114 |
+| TabNet | 0.9703 | 0.9886 | 0.7486 | 0.7166 | 0.7322 |
 
 ## Feature Engineering
 
