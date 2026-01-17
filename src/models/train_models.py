@@ -60,15 +60,14 @@ def load_and_prepare_data(data_path):
     
     # Drop unnecessary columns
     drop_cols = ['transaction_id', 'user_id', 'transaction_time', 'amount']
-    df = df.drop(columns=[col for col in drop_cols if col in df.columns])
+    df = df.drop(columns=drop_cols)
     
     # Separate features and target
     X = df.drop(columns=['is_fraud'])
     y = df['is_fraud']
     
     # Define column types
-    num_cols = ['account_age_days', 'total_transactions_user', 'shipping_distance_km', 
-                'amount_ratio', 'log_amount', 'avg_amount_user', 'hour', 'hour_sin', 'hour_cos']
+    num_cols = ['account_age_days', 'total_transactions_user', 'shipping_distance_km', 'amount_ratio', 'log_amount', 'avg_amount_user', 'hour', 'hour_sin', 'hour_cos' ]
     cat_cols = ['country', 'bin_country', 'merchant_category', 'channel']
     
     # Train-test split (time-based)
@@ -238,7 +237,7 @@ def train_tabnet(X_train, X_test, y_train, y_test, cat_cols):
     clf_tabnet = TabNetClassifier(
         cat_idxs=cat_idxs,
         cat_dims=cat_dims,
-        cat_emb_dim=10,
+        cat_emb_dim=20,
         n_d=16,
         n_a=16,
         optimizer_fn=torch.optim.Adam,
@@ -262,7 +261,7 @@ def train_tabnet(X_train, X_test, y_train, y_test, cat_cols):
         eval_name=['train', 'valid'],
         eval_metric=['auc'],
         loss_fn=loss_fn,
-        max_epochs=100,
+        max_epochs=200,
         patience=10,
         batch_size=1024, 
         virtual_batch_size=128,
